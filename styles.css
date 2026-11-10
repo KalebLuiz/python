@@ -132,9 +132,9 @@ h1 span { color: var(--muted); }
 
 .progress-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 14px;
-  max-width: 1060px;
+  max-width: 1200px;
 }
 
 .progress-card {
@@ -153,6 +153,7 @@ h1 span { color: var(--muted); }
 #trace-progress-fill { background: var(--blue); }
 #quiz-progress-fill { background: var(--amber); }
 #theory-progress-fill { background: #c084fc; }
+#mysql-progress-fill { background: #38bdf8; }
 
 .workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 18px; margin-bottom: 30px; }
 .challenge-sidebar, .practice-panel { border: 1px solid var(--line); border-radius: 14px; background: rgba(23, 31, 45, 0.93); }
@@ -2004,4 +2005,400 @@ kbd {
   border-left-color: var(--coral);
   background: rgba(255, 154, 135, 0.06);
 }
+
+/* ==========================================================================
+   Módulo Interativo de MySQL & Banco de Dados (DB_FINANC_II)
+   ========================================================================== */
+
+/* Badges de Dificuldade para Desafios SQL */
+.badge-diff {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.badge-diff.is-facil {
+  color: var(--mint);
+  background: rgba(114, 224, 192, 0.12);
+  border: 1px solid rgba(114, 224, 192, 0.3);
+}
+
+.badge-diff.is-medio {
+  color: var(--amber);
+  background: rgba(248, 192, 105, 0.12);
+  border: 1px solid rgba(248, 192, 105, 0.3);
+}
+
+.badge-diff.is-dificil {
+  color: var(--coral);
+  background: rgba(255, 154, 135, 0.12);
+  border: 1px solid rgba(255, 154, 135, 0.3);
+}
+
+/* Container do Módulo MySQL */
+.mysql-panel-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Navegador de Dificuldade e Filtro */
+.mysql-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(16, 22, 34, 0.6);
+  border: 1px solid var(--line);
+}
+
+.mysql-filter-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.mysql-filter-btn {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.mysql-filter-btn:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.mysql-filter-btn.is-active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+/* Tags de tabelas envolvidas */
+.mysql-tables-tagline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mysql-table-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #7dd3fc;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mysql-table-chip:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+}
+
+/* Explorador do Schema do Banco (Dicionário de Dados) */
+.schema-accordion {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(16, 22, 34, 0.55);
+  overflow: hidden;
+}
+
+.schema-accordion summary {
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  background: rgba(28, 38, 53, 0.5);
+  transition: background 160ms ease;
+}
+
+.schema-accordion summary:hover {
+  background: rgba(28, 38, 53, 0.85);
+}
+
+.schema-accordion[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.schema-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  padding: 14px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.schema-card {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(23, 31, 45, 0.7);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schema-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.schema-card-header strong {
+  color: #38bdf8;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.schema-rows-badge {
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.schema-card p {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.schema-cols-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.col-badge {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #c7d2fe;
+}
+
+.col-badge.is-pk {
+  background: rgba(248, 192, 105, 0.15);
+  color: var(--amber);
+  border: 1px solid rgba(248, 192, 105, 0.3);
+}
+
+.col-badge.is-fk {
+  background: rgba(114, 224, 192, 0.15);
+  color: var(--mint);
+  border: 1px solid rgba(114, 224, 192, 0.3);
+}
+
+/* Editor SQL e Toolbar */
+.sql-editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sql-editor-wrap {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0d121c;
+}
+
+.sql-editor-gutter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #151c28;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-family: var(--mono);
+}
+
+.sql-editor-area {
+  width: 100%;
+  min-height: 160px;
+  padding: 14px;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+}
+
+.sql-editor-area:focus {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* Botões do Editor SQL */
+.sql-actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-sql-run {
+  background: rgba(56, 189, 248, 0.2) !important;
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+}
+
+.btn-sql-run:hover:not(:disabled) {
+  background: #38bdf8 !important;
+  color: #0b1320 !important;
+}
+
+.btn-sql-validate {
+  background: rgba(114, 224, 192, 0.15) !important;
+  border-color: var(--mint) !important;
+  color: var(--mint) !important;
+}
+
+.btn-sql-validate:hover:not(:disabled) {
+  background: var(--mint) !important;
+  color: #0b1320 !important;
+}
+
+/* Painel de Resultados SQL */
+.sql-results-panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(16, 22, 34, 0.65);
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.sql-results-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(28, 38, 53, 0.7);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.sql-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.sql-status-indicator.is-success {
+  color: var(--mint);
+}
+
+.sql-status-indicator.is-error {
+  color: var(--coral);
+}
+
+.sql-meta-tags {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.sql-table-scroll {
+  max-height: 380px;
+  overflow: auto;
+}
+
+.sql-results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: left;
+}
+
+.sql-results-table th {
+  position: sticky;
+  top: 0;
+  padding: 8px 12px;
+  background: #1a2332;
+  color: #38bdf8;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.sql-results-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(42, 53, 70, 0.5);
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.sql-results-table tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.sql-results-table tr:hover td {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.sql-error-box {
+  padding: 14px 18px;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid var(--coral);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.sql-empty-box {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 

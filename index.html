@@ -7,6 +7,7 @@
   <title>Laboratório Python — desafios e testes de mesa interativos</title>
   <link rel="stylesheet" href="styles.css">
   <script src="theory-data.js"></script>
+  <script src="mysql-data.js"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -34,6 +35,11 @@
         <span class="pill-icon" aria-hidden="true">📖</span>
         <span>Teoria dos Slides</span>
         <span class="pill-badge">Aulas 03 a 15</span>
+      </button>
+      <button id="nav-mode-mysql" class="mode-pill" type="button" role="tab" aria-selected="false">
+        <span class="pill-icon" aria-hidden="true">🐬</span>
+        <span>MySQL Interativo</span>
+        <span class="pill-badge">DB_FINANC_II</span>
       </button>
     </nav>
 
@@ -86,6 +92,16 @@
             <span id="theory-progress-fill"></span>
           </div>
         </div>
+
+        <div class="progress-card">
+          <div class="progress-copy">
+            <span><span class="stat-icon">🐬</span> Desafios MySQL</span>
+            <strong id="mysql-progress-label">0 de 10 resolvidos</strong>
+          </div>
+          <div class="progress-track" role="progressbar" aria-label="Progresso dos desafios MySQL" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0">
+            <span id="mysql-progress-fill"></span>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -93,10 +109,13 @@
       <aside class="challenge-sidebar" aria-label="Lista de exercícios e aulas teóricas">
         <div class="sidebar-mode-toggle" role="tablist" aria-label="Alternar exibição da barra lateral">
           <button id="sidebar-tab-challenges" class="sidebar-toggle-btn is-active" type="button" role="tab" aria-selected="true">
-            <span>💻 Desafios (10)</span>
+            <span>💻 Python (10)</span>
           </button>
           <button id="sidebar-tab-theory" class="sidebar-toggle-btn" type="button" role="tab" aria-selected="false">
-            <span>📖 Aulas / Teoria (13)</span>
+            <span>📖 Teoria (13)</span>
+          </button>
+          <button id="sidebar-tab-mysql" class="sidebar-toggle-btn" type="button" role="tab" aria-selected="false">
+            <span>🐬 MySQL (10)</span>
           </button>
         </div>
         <div class="sidebar-heading">
@@ -106,7 +125,7 @@
         <nav id="challenge-list" class="challenge-list"></nav>
         <div class="sidebar-foot">
           <span class="sidebar-foot-icon" aria-hidden="true">⌘</span>
-          <p id="sidebar-foot-desc">Você pode testar código em Python, simular variáveis passo a passo, responder aos testes de mesa ou estudar a teoria dos slides com miniexercícios.</p>
+          <p id="sidebar-foot-desc">Você pode testar código em Python, simular variáveis passo a passo, responder aos testes de mesa, estudar a teoria dos slides ou resolver consultas no banco MySQL.</p>
         </div>
       </aside>
 
@@ -129,6 +148,11 @@
             <span class="panel-tab-icon" aria-hidden="true">📖</span>
             <span>Teoria dos Slides</span>
             <span class="tab-badge">Aulas 03 a 15</span>
+          </button>
+          <button id="tab-mysql-btn" class="panel-tab" role="tab" aria-selected="false" type="button">
+            <span class="panel-tab-icon" aria-hidden="true">🐬</span>
+            <span>Desafios MySQL</span>
+            <span class="tab-badge">DB_FINANC_II</span>
           </button>
         </div>
 

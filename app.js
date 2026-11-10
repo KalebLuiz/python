@@ -1400,7 +1400,9 @@ const STORAGE_KEYS = {
   solved: "laboratorio-py-solved-v1",
   traces: "laboratorio-py-traces-v1",
   quizzes: "laboratorio-py-quizzes-v1",
-  theory: "laboratorio-py-theory-v1"
+  theory: "laboratorio-py-theory-v1",
+  sqlCodes: "laboratorio-sql-codes-v1",
+  sqlSolved: "laboratorio-sql-solved-v1"
 };
 
 const challengeList = document.querySelector("#challenge-list");
@@ -1410,11 +1412,21 @@ const solvedIds = new Set(readStorage(STORAGE_KEYS.solved, []));
 const solvedTraces = new Set(readStorage(STORAGE_KEYS.traces, []));
 const solvedQuizzes = new Set(readStorage(STORAGE_KEYS.quizzes, []));
 const theoryAnswers = readStorage(STORAGE_KEYS.theory, {});
+const sqlEditorStorage = readStorage(STORAGE_KEYS.sqlCodes, {});
+const solvedSqlIds = new Set(readStorage(STORAGE_KEYS.sqlSolved, []));
 
 let activeChallenge = challenges[0];
-let activeView = "code"; // "code" | "trace" | "interactive" | "theory"
+let activeView = "code"; // "code" | "trace" | "interactive" | "theory" | "mysql"
 let activeTheoryTopicId = 3;
-let sidebarMode = "challenges"; // "challenges" | "theory"
+let activeSqlChallengeId = 1;
+let activeSqlDifficulty = "Todos";
+let sidebarMode = "challenges"; // "challenges" | "theory" | "mysql"
+let lastSqlResult = null;
+let lastSqlError = null;
+let lastSqlChallengeId = null;
+let activeSqlRunChallengeId = null;
+let isSqlRunning = false;
+let isWorkerSqlReady = false;
 let traceCaseIndex = 0;
 let traceCurrentStep = 0;
 let traceSteps = [];
@@ -1494,27 +1506,32 @@ function getTheoryTopicScore(topic) {
 function syncSidebarMode() {
   const btnChallenges = document.querySelector("#sidebar-tab-challenges");
   const btnTheory = document.querySelector("#sidebar-tab-theory");
+  const btnMysql = document.querySelector("#sidebar-tab-mysql");
   const title = document.querySelector("#sidebar-title");
   const countBadge = document.querySelector("#challenge-count");
   const desc = document.querySelector("#sidebar-foot-desc");
 
+  btnChallenges?.classList.toggle("is-active", sidebarMode === "challenges");
+  btnChallenges?.setAttribute("aria-selected", sidebarMode === "challenges" ? "true" : "false");
+  btnTheory?.classList.toggle("is-active", sidebarMode === "theory");
+  btnTheory?.setAttribute("aria-selected", sidebarMode === "theory" ? "true" : "false");
+  btnMysql?.classList.toggle("is-active", sidebarMode === "mysql");
+  btnMysql?.setAttribute("aria-selected", sidebarMode === "mysql" ? "true" : "false");
+
   if (sidebarMode === "challenges") {
-    btnChallenges?.classList.add("is-active");
-    btnChallenges?.setAttribute("aria-selected", "true");
-    btnTheory?.classList.remove("is-active");
-    btnTheory?.setAttribute("aria-selected", "false");
-    if (title) title.textContent = "Exercícios";
+    if (title) title.textContent = "Exercícios Python";
     if (countBadge) countBadge.textContent = `${challenges.length} disponíveis`;
     if (desc) desc.textContent = "Você pode testar código em Python, simular variáveis passo a passo ou interagir respondendo aos testes de mesa.";
-  } else {
-    btnTheory?.classList.add("is-active");
-    btnTheory?.setAttribute("aria-selected", "true");
-    btnChallenges?.classList.remove("is-active");
-    btnChallenges?.setAttribute("aria-selected", "false");
+  } else if (sidebarMode === "theory") {
     if (title) title.textContent = "Aulas & Slides";
     const totalTheory = (typeof theoryTopics !== "undefined") ? theoryTopics.length : 13;
     if (countBadge) countBadge.textContent = `${totalTheory} tópicos (03 a 15)`;
     if (desc) desc.textContent = "Fundamentos teóricos extraídos dos slides das aulas 03 a 15, com miniexercícios e correlação direta aos testes de mesa.";
+  } else {
+    if (title) title.textContent = "Desafios MySQL";
+    const totalSql = (typeof sqlChallenges !== "undefined") ? sqlChallenges.length : 10;
+    if (countBadge) countBadge.textContent = `${totalSql} desafios (Fácil a Difícil)`;
+    if (desc) desc.textContent = "Consultas interativas no banco de dados bancário DB_FINANC_II com validação automática de dados.";
   }
 }
 
@@ -1554,6 +1571,15 @@ function updateProgress() {
     theoryFill.style.width = `${(completedTheory / totalTheory) * 100}%`;
   }
 
+  const mysqlLabel = document.querySelector("#mysql-progress-label");
+  const mysqlFill = document.querySelector("#mysql-progress-fill");
+  if (mysqlLabel && mysqlFill && typeof sqlChallenges !== "undefined") {
+    const completedSql = solvedSqlIds.size;
+    const totalSql = sqlChallenges.length;
+    mysqlLabel.textContent = `${completedSql} de ${totalSql} resolvidos`;
+    mysqlFill.style.width = `${(completedSql / totalSql) * 100}%`;
+  }
+
   const countBadge = document.querySelector("#challenge-count");
   if (countBadge && sidebarMode === "challenges") {
     countBadge.textContent = `${total} disponíveis`;
@@ -1573,7 +1599,7 @@ function renderChallengeList() {
       const button = document.createElement("button");
       button.className = `challenge-link${isCodeSolved ? " is-solved" : ""}`;
       button.type = "button";
-      button.setAttribute("aria-current", (challenge.id === activeChallenge.id && activeView !== "theory") ? "page" : "false");
+      button.setAttribute("aria-current", (challenge.id === activeChallenge.id && activeView !== "theory" && activeView !== "mysql") ? "page" : "false");
       
       button.innerHTML = `
         <span class="challenge-number">${isCodeSolved ? "✓" : String(challenge.id).padStart(2, "0")}</span>
@@ -1590,7 +1616,7 @@ function renderChallengeList() {
       button.addEventListener("click", () => selectChallenge(challenge.id));
       challengeList.append(button);
     }
-  } else {
+  } else if (sidebarMode === "theory") {
     if (typeof theoryTopics !== "undefined") {
       for (const topic of theoryTopics) {
         const isMastered = isTheoryTopicMastered(topic);
@@ -1616,6 +1642,33 @@ function renderChallengeList() {
         challengeList.append(button);
       }
     }
+  } else {
+    // Modo MySQL
+    if (typeof sqlChallenges !== "undefined") {
+      for (const challenge of sqlChallenges) {
+        const isSolved = solvedSqlIds.has(challenge.id);
+        const isSelected = activeView === "mysql" && challenge.id === activeSqlChallengeId;
+        const diffClass = challenge.difficulty.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        const button = document.createElement("button");
+        button.className = `challenge-link${isSolved ? " is-solved" : ""}`;
+        button.type = "button";
+        button.setAttribute("aria-current", isSelected ? "page" : "false");
+
+        button.innerHTML = `
+          <span class="challenge-number">${isSolved ? "✓" : String(challenge.id).padStart(2, "0")}</span>
+          <span class="challenge-link-copy">
+            <strong>${escapeHtml(challenge.title)}</strong>
+            <small><span class="badge-diff is-${diffClass}">${escapeHtml(challenge.difficulty)}</span> &middot; ${escapeHtml(challenge.topic)}</small>
+          </span>
+          <span class="challenge-badges">
+            <span class="badge-dot" title="Desafio MySQL">🐬</span>
+          </span>`;
+
+        button.addEventListener("click", () => selectSqlChallenge(challenge.id));
+        challengeList.append(button);
+      }
+    }
   }
 }
 
@@ -1632,17 +1685,20 @@ function syncViewTabs() {
   const traceTab = document.querySelector("#tab-trace-btn");
   const interactiveTab = document.querySelector("#tab-interactive-btn");
   const theoryTab = document.querySelector("#tab-theory-btn");
+  const mysqlTab = document.querySelector("#tab-mysql-btn");
 
   const navCode = document.querySelector("#nav-mode-code");
   const navTrace = document.querySelector("#nav-mode-trace");
   const navQuiz = document.querySelector("#nav-mode-quiz");
   const navTheory = document.querySelector("#nav-mode-theory");
+  const navMysql = document.querySelector("#nav-mode-mysql");
 
   const tabs = [
     { view: "code", panelBtn: codeTab, navBtn: navCode },
     { view: "trace", panelBtn: traceTab, navBtn: navTrace },
     { view: "interactive", panelBtn: interactiveTab, navBtn: navQuiz },
-    { view: "theory", panelBtn: theoryTab, navBtn: navTheory }
+    { view: "theory", panelBtn: theoryTab, navBtn: navTheory },
+    { view: "mysql", panelBtn: mysqlTab, navBtn: navMysql }
   ];
 
   tabs.forEach(t => {
@@ -1654,12 +1710,15 @@ function syncViewTabs() {
   });
 }
 
-function setView(view, topicId = null) {
+function setView(view, param = null) {
   if (autoPlayTimer) stopAutoPlay();
   activeView = view;
   if (view === "theory") {
     sidebarMode = "theory";
-    if (topicId) activeTheoryTopicId = topicId;
+    if (param) activeTheoryTopicId = param;
+  } else if (view === "mysql") {
+    sidebarMode = "mysql";
+    if (param) activeSqlChallengeId = param;
   } else {
     sidebarMode = "challenges";
   }
@@ -1683,7 +1742,323 @@ function renderActiveView() {
     initInteractiveView();
   } else if (activeView === "theory") {
     renderTheoryView();
+  } else if (activeView === "mysql") {
+    renderMysqlView();
   }
+}
+
+function selectSqlChallenge(id) {
+  const sqlEditor = document.querySelector("#sql-editor");
+  if (sqlEditor && activeView === "mysql") {
+    sqlEditorStorage[activeSqlChallengeId] = sqlEditor.value;
+    saveStorage(STORAGE_KEYS.sqlCodes, sqlEditorStorage);
+  }
+  activeSqlChallengeId = id;
+  lastSqlResult = null;
+  lastSqlError = null;
+  lastSqlChallengeId = null;
+  setView("mysql", id);
+}
+
+function runSql(validate = true) {
+  const editor = document.querySelector("#sql-editor");
+  if (!editor || !editor.value.trim()) {
+    showFeedback("Escreva sua consulta SQL antes de executar.", "info");
+    editor?.focus();
+    return;
+  }
+  if (!workerReady) {
+    showFeedback("O ambiente do banco de dados ainda está carregando no navegador. Aguarde alguns segundos...", "info");
+    return;
+  }
+  if (!isWorkerSqlReady) {
+    showFeedback("Não foi possível carregar o banco local. Confirme se mysql_financ.db está na pasta do site e abra por um servidor local.", "error");
+    return;
+  }
+  if (isSqlRunning) return;
+
+  activeSqlRunChallengeId = activeSqlChallengeId;
+  isSqlRunning = true;
+  lastSqlResult = null;
+  lastSqlError = null;
+  lastSqlChallengeId = activeSqlChallengeId;
+  renderMysqlView();
+
+  const challenge = typeof sqlChallenges !== "undefined"
+    ? (sqlChallenges.find(c => c.id === activeSqlChallengeId) || sqlChallenges[0])
+    : null;
+
+  worker.postMessage({
+    type: "run-sql",
+    query: editor.value,
+    expectedQuery: (validate && challenge) ? challenge.solutionQuery : "",
+    challengeId: challenge ? challenge.id : 1
+  });
+}
+
+function filterSqlDifficulty(difficulty) {
+  activeSqlDifficulty = difficulty;
+  if (difficulty !== "Todos") {
+    const firstMatch = sqlChallenges.find(challenge => challenge.difficulty === difficulty);
+    if (firstMatch) {
+      activeSqlChallengeId = firstMatch.id;
+      lastSqlResult = null;
+      lastSqlError = null;
+      lastSqlChallengeId = null;
+    }
+  }
+  renderMysqlView();
+}
+
+function showSqlHint() {
+  if (typeof sqlChallenges === "undefined") return;
+  const challenge = sqlChallenges.find(c => c.id === activeSqlChallengeId);
+  if (!challenge) return;
+  showFeedback(`💡 Dica do Desafio ${challenge.id}: ${challenge.hint}`, "info");
+}
+
+function showSqlSolution() {
+  if (typeof sqlChallenges === "undefined") return;
+  const challenge = sqlChallenges.find(c => c.id === activeSqlChallengeId);
+  if (!challenge) return;
+  const editor = document.querySelector("#sql-editor");
+  if (editor) {
+    editor.value = challenge.solutionQuery;
+    sqlEditorStorage[challenge.id] = editor.value;
+    saveStorage(STORAGE_KEYS.sqlCodes, sqlEditorStorage);
+    editor.focus();
+    showFeedback("Gabarito da consulta carregado no editor. Clique em 'Validar Desafio' para testar.", "info");
+  }
+}
+
+function resetSqlCode() {
+  if (typeof sqlChallenges === "undefined") return;
+  const challenge = sqlChallenges.find(c => c.id === activeSqlChallengeId);
+  if (!challenge) return;
+  const editor = document.querySelector("#sql-editor");
+  if (editor) {
+    editor.value = challenge.starterQuery;
+    sqlEditorStorage[challenge.id] = editor.value;
+    saveStorage(STORAGE_KEYS.sqlCodes, sqlEditorStorage);
+    lastSqlResult = null;
+    lastSqlError = null;
+    renderMysqlView();
+    showFeedback("Consulta restaurada para o estado inicial.", "info");
+  }
+}
+
+async function copySqlCode() {
+  const editor = document.querySelector("#sql-editor");
+  if (!editor) return;
+  try {
+    await navigator.clipboard.writeText(editor.value);
+    showFeedback("Código SQL copiado para a área de transferência.", "success");
+  } catch {
+    showFeedback("Não foi possível copiar automaticamente. Selecione e copie manualmente.", "error");
+  }
+}
+
+function renderMysqlView() {
+  if (typeof sqlChallenges === "undefined" || !sqlChallenges.length) {
+    content.innerHTML = "<p>Desafios de MySQL não encontrados.</p>";
+    return;
+  }
+
+  const challenge = sqlChallenges.find(c => c.id === activeSqlChallengeId) || sqlChallenges[0];
+  const query = sqlEditorStorage[challenge.id] ?? challenge.starterQuery;
+  const isSolved = solvedSqlIds.has(challenge.id);
+  const diffClass = challenge.difficulty.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const visibleChallenges = activeSqlDifficulty === "Todos"
+    ? sqlChallenges
+    : sqlChallenges.filter(c => c.difficulty === activeSqlDifficulty);
+  const challengeIsRunning = isSqlRunning && activeSqlRunChallengeId === challenge.id;
+
+  // Navegador superior em pills de todos os 10 desafios
+  const pillsHtml = `
+    <nav class="theory-topics-nav" aria-label="Navegação entre desafios MySQL">
+      ${visibleChallenges.map(c => {
+        const active = c.id === challenge.id ? " is-active" : "";
+        const solved = solvedSqlIds.has(c.id) ? ' <span class="pill-check">✓</span>' : "";
+        const cDiffClass = c.difficulty.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return `<button class="theory-topic-pill-btn${active}" type="button" onclick="selectSqlChallenge(${c.id})">
+          <span>#${c.id} ${escapeHtml(c.title)}</span>
+          <span class="badge-diff is-${cDiffClass}">${escapeHtml(c.difficulty)}</span>${solved}
+        </button>`;
+      }).join("")}
+    </nav>
+  `;
+  const difficultyFilterHtml = `
+    <div class="mysql-filter-bar" aria-label="Filtrar desafios por dificuldade">
+      <span class="mysql-filter-label">Nível:</span>
+      <div class="mysql-filter-pills" role="group" aria-label="Níveis de dificuldade">
+        ${["Todos", "Fácil", "Médio", "Difícil"].map(difficulty => `
+          <button class="mysql-filter-btn${activeSqlDifficulty === difficulty ? " is-active" : ""}" type="button" aria-pressed="${activeSqlDifficulty === difficulty}" onclick="filterSqlDifficulty('${difficulty}')">${difficulty}</button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+
+  // Dicionário de tabelas interativo do banco DB_FINANC_II
+  const schemaHtml = (typeof mysqlSchema !== "undefined") ? `
+    <details class="schema-accordion">
+      <summary>
+        <span>🗄️ Dicionário do Banco de Dados: <strong>DB_FINANC_II</strong> (${mysqlSchema.length} tabelas relacionais)</span>
+        <span style="font-size: 11px; color: var(--muted); font-weight: normal;">Clique para expandir / ocultar colunas</span>
+      </summary>
+      <div class="schema-grid">
+        ${mysqlSchema.map(tbl => `
+          <div class="schema-card">
+            <div class="schema-card-header">
+              <strong>${escapeHtml(tbl.name)}</strong>
+              <span class="schema-rows-badge">${tbl.rowsCount.toLocaleString()} linhas</span>
+            </div>
+            <p>${escapeHtml(tbl.description)}</p>
+            <div class="schema-cols-list">
+              ${tbl.columns.map(col => {
+                let badgeClass = "col-badge";
+                if (col.pk) badgeClass += " is-pk";
+                else if (col.fk) badgeClass += " is-fk";
+                return `<span class="${badgeClass}" title="${escapeHtml(col.type)} - ${escapeHtml(col.desc)}">${escapeHtml(col.name)}${col.pk ? ' (PK)' : (col.fk ? ' (FK)' : '')}</span>`;
+              }).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </details>
+  ` : "";
+
+  // Renderização do painel de resultados
+  let resultsHtml = "";
+  if (challengeIsRunning) {
+    resultsHtml = `
+      <div class="sql-results-panel">
+        <div class="sql-empty-box">
+          <span class="status-dot"></span> Executando consulta SQL no banco de dados local...
+        </div>
+      </div>
+    `;
+  } else if (lastSqlChallengeId === challenge.id && lastSqlError) {
+    resultsHtml = `
+      <div class="sql-results-panel">
+        <div class="sql-results-header">
+          <span class="sql-status-indicator is-error">✕ Erro de Execução SQL</span>
+        </div>
+        <div class="sql-error-box">${escapeHtml(lastSqlError)}</div>
+      </div>
+    `;
+  } else if (lastSqlChallengeId === challenge.id && lastSqlResult) {
+    const r = lastSqlResult;
+    const isSuccess = r.passed;
+    let badgeText = "";
+    if (r.expectedTotalRows !== null && r.expectedTotalRows !== undefined) {
+      badgeText = isSuccess
+        ? `<span class="sql-status-indicator is-success">✓ Desafio conquistado! Resultado confere com o esperado.</span>`
+        : `<span class="sql-status-indicator is-error">✕ Resultado diferente do esperado (${r.totalRows} linhas retornadas; ${r.expectedTotalRows} esperadas).</span>`;
+    } else {
+      badgeText = `<span class="sql-status-indicator is-success">✓ Consulta Executada com Sucesso</span>`;
+    }
+
+    const tableRows = r.rows.map(row => `
+      <tr>${row.map(cell => `<td>${escapeHtml(cell !== null ? cell : "NULL")}</td>`).join("")}</tr>
+    `).join("");
+
+    resultsHtml = `
+      <div class="sql-results-panel">
+        <div class="sql-results-header">
+          ${badgeText}
+          <div class="sql-meta-tags">
+            <span>⚡ ${r.elapsedMs} ms</span>
+            <span>Total: <strong>${r.totalRows}</strong> linha(s)${r.displayedRows < r.totalRows ? ` (exibindo ${r.displayedRows})` : ''}</span>
+            <span>Colunas: <strong>${r.columns.length}</strong></span>
+          </div>
+        </div>
+        ${r.columns.length ? `
+          <div class="sql-table-scroll">
+            <table class="sql-results-table">
+              <thead>
+                <tr>${r.columns.map(c => `<th>${escapeHtml(c)}</th>`).join("")}</tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
+          </div>
+        ` : `<div class="sql-empty-box">A consulta não retornou linhas para exibição.</div>`}
+      </div>
+    `;
+  } else {
+    resultsHtml = `
+      <div class="sql-results-panel">
+        <div class="sql-empty-box">
+          Escreva sua consulta SQL acima e clique em <strong>▶ Executar SQL Livre</strong> ou <strong>🎯 Validar Desafio</strong> para ver os dados retornados de <code>DB_FINANC_II</code>.
+        </div>
+      </div>
+    `;
+  }
+
+  content.innerHTML = `
+    <div class="mysql-panel-wrapper">
+      ${pillsHtml}
+      ${difficultyFilterHtml}
+
+      <div class="challenge-topline">
+        <span class="challenge-kicker">DESAFIO MYSQL ${String(challenge.id).padStart(2, "0")} / 10 &middot; BANCO DE DADOS REAL</span>
+        <span class="badge-diff is-${diffClass}">${escapeHtml(challenge.difficulty)}</span>
+      </div>
+
+      <h2 class="challenge-title">${escapeHtml(challenge.title)}</h2>
+      <p class="challenge-topic">${escapeHtml(challenge.topic)} <span aria-hidden="true">&middot;</span> Tabelas: ${challenge.tables.map(t => `<span class="mysql-table-chip">${t}</span>`).join(" ")}</p>
+
+      <div class="challenge-statement">${challenge.prompt}</div>
+
+      ${schemaHtml}
+
+      <div class="editor-header">
+        <label class="editor-label" for="sql-editor"><span class="file-icon">🐬</span> Consulta SQL (MySQL 8.0 / SQLite)</label>
+        <span class="editor-lang">SQL 8.0</span>
+      </div>
+
+      <div class="sql-editor-wrap">
+        <div class="sql-editor-gutter">
+          <span>consulta_desafio_${challenge.id}.sql</span>
+          <span>Base: DB_FINANC_II</span>
+        </div>
+        <textarea id="sql-editor" class="sql-editor-area" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Editor de consultas SQL">${escapeHtml(query)}</textarea>
+      </div>
+
+      <div class="sql-actions-bar">
+        <button id="btn-sql-validate" class="button btn-sql-validate" type="button" ${challengeIsRunning ? "disabled" : ""} onclick="runSql(true)">
+          <span class="button-icon">🎯</span> Validar Desafio
+        </button>
+        <button id="btn-sql-run" class="button btn-sql-run" type="button" ${challengeIsRunning ? "disabled" : ""} onclick="runSql(false)">
+          <span class="button-icon">▶</span> Executar SQL Livre
+        </button>
+        <button id="btn-sql-hint" class="button" type="button" onclick="showSqlHint()">
+          <span class="button-icon">💡</span> Dica
+        </button>
+        <button id="btn-sql-solution" class="button" type="button" onclick="showSqlSolution()">
+          <span class="button-icon">⌁</span> Ver Solução
+        </button>
+        <button id="btn-sql-reset" class="button" type="button" onclick="resetSqlCode()">
+          <span class="button-icon">↺</span> Resetar
+        </button>
+        <button id="btn-sql-copy" class="button" type="button" onclick="copySqlCode()">
+          <span class="button-icon">📋</span> Copiar
+        </button>
+      </div>
+
+      <div id="feedback" class="feedback" hidden></div>
+
+      ${resultsHtml}
+    </div>
+  `;
+
+  // Salvar digitação em localStorage
+  const sqlEditor = document.querySelector("#sql-editor");
+  sqlEditor?.addEventListener("input", (e) => {
+    sqlEditorStorage[challenge.id] = e.target.value;
+    saveStorage(STORAGE_KEYS.sqlCodes, sqlEditorStorage);
+  });
 }
 
 function selectTheoryTopic(topicId) {
@@ -2757,6 +3132,37 @@ function createWorker() {
     const message = event.data;
     if (message.type === "ready") {
       workerReady = true;
+      isWorkerSqlReady = Boolean(message.sqlReady);
+      if (activeView === "mysql" && !isWorkerSqlReady) {
+        showFeedback("Não foi possível carregar mysql_financ.db. Confira se o arquivo está na pasta do site.", "error");
+      }
+      return;
+    }
+    if (message.type === "sql-results") {
+      const challengeId = message.challengeId;
+      isSqlRunning = false;
+      activeSqlRunChallengeId = null;
+      if (challengeId !== activeSqlChallengeId) return;
+      lastSqlChallengeId = challengeId;
+      lastSqlResult = message.data;
+      lastSqlError = null;
+      if (message.data.expectedTotalRows !== null && message.data.passed) {
+        solvedSqlIds.add(challengeId);
+        saveStorage(STORAGE_KEYS.sqlSolved, [...solvedSqlIds]);
+        updateProgress();
+        renderChallengeList();
+      }
+      if (activeView === "mysql") renderMysqlView();
+      return;
+    }
+    if (message.type === "sql-error") {
+      isSqlRunning = false;
+      activeSqlRunChallengeId = null;
+      if (message.challengeId !== activeSqlChallengeId) return;
+      lastSqlChallengeId = message.challengeId;
+      lastSqlError = message.message;
+      lastSqlResult = null;
+      if (activeView === "mysql") renderMysqlView();
       return;
     }
     if (message.type === "results") {
@@ -2788,6 +3194,8 @@ function createWorker() {
     clearTimeout(workerTimer);
     setRunnerLoading(false);
     worker.terminate();
+    workerReady = false;
+    isWorkerSqlReady = false;
     showFeedback("Não foi possível iniciar o executor Python. Verifique sua conexão com a internet e abra o site por um servidor local.", "error");
   });
   worker.postMessage({ type: "init" });
@@ -2878,11 +3286,13 @@ document.querySelector("#nav-mode-code")?.addEventListener("click", () => setVie
 document.querySelector("#nav-mode-trace")?.addEventListener("click", () => setView("trace"));
 document.querySelector("#nav-mode-quiz")?.addEventListener("click", () => setView("interactive"));
 document.querySelector("#nav-mode-theory")?.addEventListener("click", () => setView("theory"));
+document.querySelector("#nav-mode-mysql")?.addEventListener("click", () => setView("mysql"));
 
 document.querySelector("#tab-code-btn")?.addEventListener("click", () => setView("code"));
 document.querySelector("#tab-trace-btn")?.addEventListener("click", () => setView("trace"));
 document.querySelector("#tab-interactive-btn")?.addEventListener("click", () => setView("interactive"));
 document.querySelector("#tab-theory-btn")?.addEventListener("click", () => setView("theory"));
+document.querySelector("#tab-mysql-btn")?.addEventListener("click", () => setView("mysql"));
 
 // Sidebar mode switcher
 document.querySelector("#sidebar-tab-challenges")?.addEventListener("click", () => {
@@ -2897,6 +3307,15 @@ document.querySelector("#sidebar-tab-theory")?.addEventListener("click", () => {
   renderChallengeList();
   if (activeView !== "theory") {
     setView("theory");
+  }
+});
+
+document.querySelector("#sidebar-tab-mysql")?.addEventListener("click", () => {
+  sidebarMode = "mysql";
+  syncSidebarMode();
+  renderChallengeList();
+  if (activeView !== "mysql") {
+    setView("mysql");
   }
 });
 
