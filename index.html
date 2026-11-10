@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101622">
-  <title>Laboratório Python — desafios de programação</title>
+  <title>Laboratório Python — desafios e testes de mesa interativos</title>
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
@@ -14,46 +14,102 @@
       <span class="brand-mark" aria-hidden="true">&lt;/&gt;</span>
       <span>laboratório<span class="brand-accent">.py</span></span>
     </a>
-    <div class="topbar-note"><span class="status-dot"></span> Seus códigos ficam neste navegador</div>
+
+    <nav class="mode-nav" aria-label="Modo de estudo" role="tablist">
+      <button id="nav-mode-code" class="mode-pill is-active" type="button" role="tab" aria-selected="true">
+        <span class="pill-icon" aria-hidden="true">💻</span>
+        <span>Código &amp; Testes</span>
+      </button>
+      <button id="nav-mode-trace" class="mode-pill" type="button" role="tab" aria-selected="false">
+        <span class="pill-icon" aria-hidden="true">📊</span>
+        <span>Simulação de Mesa</span>
+      </button>
+      <button id="nav-mode-quiz" class="mode-pill" type="button" role="tab" aria-selected="false">
+        <span class="pill-icon" aria-hidden="true">🎯</span>
+        <span>Responder Testes</span>
+        <span class="pill-badge">Interativo</span>
+      </button>
+    </nav>
+
+    <div class="topbar-note"><span class="status-dot"></span> Seus códigos e progresso ficam neste navegador</div>
   </header>
 
   <main class="page-shell">
     <section class="intro">
-      <p class="eyebrow">PRÁTICA DE PROGRAMAÇÃO</p>
-      <h1>Aprenda fazendo.<br><span>Um desafio de cada vez.</span></h1>
-      <p class="intro-copy">De expressões e estruturas de repetição até matrizes, busca e ordenação. Escreva sua solução e confira com testes.</p>
-      <div class="progress-card">
-        <div class="progress-copy">
-          <span>Seu progresso</span>
-          <strong id="progress-label">0 de 10 concluídos</strong>
+      <p class="eyebrow">PRÁTICA DE PROGRAMAÇÃO &amp; TESTES DE MESA</p>
+      <h1>Aprenda fazendo.<br><span>Código, Simulação e Desafios Interativos.</span></h1>
+      <p class="intro-copy">De expressões e repetições até matrizes, busca e ordenação. Escreva sua solução em Python, acompanhe o fluxo de variáveis e responda aos testes de mesa interativos para fixar a lógica.</p>
+      
+      <div class="progress-card-grid">
+        <div class="progress-card">
+          <div class="progress-copy">
+            <span><span class="stat-icon">💻</span> Código em Python</span>
+            <strong id="progress-label">0 de 10 concluídos</strong>
+          </div>
+          <div class="progress-track" role="progressbar" aria-label="Progresso dos desafios de código" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0">
+            <span id="progress-fill"></span>
+          </div>
         </div>
-        <div class="progress-track" role="progressbar" aria-label="Progresso dos desafios" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0">
-          <span id="progress-fill"></span>
+
+        <div class="progress-card">
+          <div class="progress-copy">
+            <span><span class="stat-icon">📊</span> Testes de Mesa</span>
+            <strong id="trace-progress-label">0 de 10 explorados</strong>
+          </div>
+          <div class="progress-track" role="progressbar" aria-label="Progresso dos testes de mesa" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0">
+            <span id="trace-progress-fill"></span>
+          </div>
+        </div>
+
+        <div class="progress-card">
+          <div class="progress-copy">
+            <span><span class="stat-icon">🎯</span> Desafios Respondidos</span>
+            <strong id="quiz-progress-label">0 de 10 dominados</strong>
+          </div>
+          <div class="progress-track" role="progressbar" aria-label="Progresso dos testes respondidos" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0">
+            <span id="quiz-progress-fill"></span>
+          </div>
         </div>
       </div>
     </section>
 
     <div class="workspace">
-      <aside class="challenge-sidebar" aria-label="Lista de desafios">
+      <aside class="challenge-sidebar" aria-label="Lista de exercícios">
         <div class="sidebar-heading">
-          <h2>Desafios</h2>
-          <span id="challenge-count">10 exercícios</span>
+          <h2>Exercícios</h2>
+          <span id="challenge-count">10 disponíveis</span>
         </div>
         <nav id="challenge-list" class="challenge-list"></nav>
         <div class="sidebar-foot">
           <span class="sidebar-foot-icon" aria-hidden="true">⌘</span>
-          <p>As soluções são opcionais. Tente resolver antes de abrir uma dica.</p>
+          <p>Você pode testar código em Python, simular variáveis passo a passo ou interagir respondendo aos testes de mesa.</p>
         </div>
       </aside>
 
-      <section class="practice-panel">
+      <section class="practice-panel" id="practice-panel">
+        <div class="panel-view-switcher" role="tablist" aria-label="Visualização do exercício">
+          <button id="tab-code-btn" class="panel-tab is-active" role="tab" aria-selected="true" type="button">
+            <span class="panel-tab-icon" aria-hidden="true">💻</span>
+            <span>Editor &amp; Testes Python</span>
+          </button>
+          <button id="tab-trace-btn" class="panel-tab" role="tab" aria-selected="false" type="button">
+            <span class="panel-tab-icon" aria-hidden="true">📊</span>
+            <span>Simulação de Mesa</span>
+          </button>
+          <button id="tab-interactive-btn" class="panel-tab" role="tab" aria-selected="false" type="button">
+            <span class="panel-tab-icon" aria-hidden="true">🎯</span>
+            <span>Responder Teste de Mesa</span>
+            <span class="tab-badge">Interativo</span>
+          </button>
+        </div>
+
         <div id="challenge-content"></div>
       </section>
     </div>
 
     <footer class="page-footer">
-      <span>Inspirado nas aulas de Linguagem de Programação — Aulas 03 a 15.</span>
-      <span>Execução local com Python no navegador · Pyodide</span>
+      <span>Inspirado nas aulas de Linguagem de Programação — Aulas 03 a 15 · Testes de mesa, perguntas interativas e rastreamento.</span>
+      <span>Execução local no navegador · Pyodide e Simulador Interativo</span>
     </footer>
   </main>
 </body>
