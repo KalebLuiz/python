@@ -1399,7 +1399,8 @@ const STORAGE_KEYS = {
   codes: "laboratorio-py-codes-v1",
   solved: "laboratorio-py-solved-v1",
   traces: "laboratorio-py-traces-v1",
-  quizzes: "laboratorio-py-quizzes-v1"
+  quizzes: "laboratorio-py-quizzes-v1",
+  theory: "laboratorio-py-theory-v1"
 };
 
 const challengeList = document.querySelector("#challenge-list");
@@ -1408,9 +1409,12 @@ const editorStorage = readStorage(STORAGE_KEYS.codes, {});
 const solvedIds = new Set(readStorage(STORAGE_KEYS.solved, []));
 const solvedTraces = new Set(readStorage(STORAGE_KEYS.traces, []));
 const solvedQuizzes = new Set(readStorage(STORAGE_KEYS.quizzes, []));
+const theoryAnswers = readStorage(STORAGE_KEYS.theory, {});
 
 let activeChallenge = challenges[0];
-let activeView = "code"; // "code" | "trace" | "interactive"
+let activeView = "code"; // "code" | "trace" | "interactive" | "theory"
+let activeTheoryTopicId = 3;
+let sidebarMode = "challenges"; // "challenges" | "theory"
 let traceCaseIndex = 0;
 let traceCurrentStep = 0;
 let traceSteps = [];
@@ -1457,6 +1461,63 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function getTheoryTopicForChallenge(challengeId) {
+  const map = {
+    1: 5,  // Total com desconto -> Aula 05 (Expressões e Operadores)
+    2: 6,  // Ano bissexto -> Aula 06 (Lógica e Condicionais)
+    3: 7,  // Resultado da prova -> Aula 07 (Strings, Flags e Elif)
+    4: 9,  // Soma dos pares -> Aula 09 (Laço While, Acumuladores e Contadores)
+    5: 7,  // Contador de vogais -> Aula 07 (Strings e Seleção)
+    6: 13, // Remover repetidos -> Aula 13 (Operações em Sequências)
+    7: 10, // Maior trecho crescente -> Aula 10 (Laços Aninhados, Break e Continue)
+    8: 14, // Soma das diagonais -> Aula 14 (Matrizes e Tabelas)
+    9: 15, // Busca binária -> Aula 15 (Busca Linear e Binária)
+    10: 15 // Ordenação por bolhas -> Aula 15 (Bubble Sort)
+  };
+  return map[challengeId] || 3;
+}
+
+function isTheoryTopicMastered(topic) {
+  if (!topic || !topic.miniExercises || !topic.miniExercises.length) return false;
+  return topic.miniExercises.every(ex => theoryAnswers[ex.id] === ex.correct);
+}
+
+function getTheoryTopicScore(topic) {
+  if (!topic || !topic.miniExercises) return { correct: 0, total: 0 };
+  let correct = 0;
+  for (const ex of topic.miniExercises) {
+    if (theoryAnswers[ex.id] === ex.correct) correct++;
+  }
+  return { correct, total: topic.miniExercises.length };
+}
+
+function syncSidebarMode() {
+  const btnChallenges = document.querySelector("#sidebar-tab-challenges");
+  const btnTheory = document.querySelector("#sidebar-tab-theory");
+  const title = document.querySelector("#sidebar-title");
+  const countBadge = document.querySelector("#challenge-count");
+  const desc = document.querySelector("#sidebar-foot-desc");
+
+  if (sidebarMode === "challenges") {
+    btnChallenges?.classList.add("is-active");
+    btnChallenges?.setAttribute("aria-selected", "true");
+    btnTheory?.classList.remove("is-active");
+    btnTheory?.setAttribute("aria-selected", "false");
+    if (title) title.textContent = "Exercícios";
+    if (countBadge) countBadge.textContent = `${challenges.length} disponíveis`;
+    if (desc) desc.textContent = "Você pode testar código em Python, simular variáveis passo a passo ou interagir respondendo aos testes de mesa.";
+  } else {
+    btnTheory?.classList.add("is-active");
+    btnTheory?.setAttribute("aria-selected", "true");
+    btnChallenges?.classList.remove("is-active");
+    btnChallenges?.setAttribute("aria-selected", "false");
+    if (title) title.textContent = "Aulas & Slides";
+    const totalTheory = (typeof theoryTopics !== "undefined") ? theoryTopics.length : 13;
+    if (countBadge) countBadge.textContent = `${totalTheory} tópicos (03 a 15)`;
+    if (desc) desc.textContent = "Fundamentos teóricos extraídos dos slides das aulas 03 a 15, com miniexercícios e correlação direta aos testes de mesa.";
+  }
+}
+
 function updateProgress() {
   const completedCode = solvedIds.size;
   const completedTrace = solvedTraces.size;
@@ -1484,38 +1545,77 @@ function updateProgress() {
     quizFill.style.width = `${(completedQuiz / total) * 100}%`;
   }
 
+  const theoryLabel = document.querySelector("#theory-progress-label");
+  const theoryFill = document.querySelector("#theory-progress-fill");
+  if (theoryLabel && theoryFill && typeof theoryTopics !== "undefined") {
+    const completedTheory = theoryTopics.filter(isTheoryTopicMastered).length;
+    const totalTheory = theoryTopics.length;
+    theoryLabel.textContent = `${completedTheory} de ${totalTheory} tópicos dominados`;
+    theoryFill.style.width = `${(completedTheory / totalTheory) * 100}%`;
+  }
+
   const countBadge = document.querySelector("#challenge-count");
-  if (countBadge) {
+  if (countBadge && sidebarMode === "challenges") {
     countBadge.textContent = `${total} disponíveis`;
   }
 }
 
 function renderChallengeList() {
   challengeList.replaceChildren();
-  for (const challenge of challenges) {
-    const isCodeSolved = solvedIds.has(challenge.id);
-    const isTraceSolved = solvedTraces.has(challenge.id);
-    const isQuizSolved = solvedQuizzes.has(challenge.id);
+  syncSidebarMode();
 
-    const button = document.createElement("button");
-    button.className = `challenge-link${isCodeSolved ? " is-solved" : ""}`;
-    button.type = "button";
-    button.setAttribute("aria-current", challenge.id === activeChallenge.id ? "page" : "false");
-    
-    button.innerHTML = `
-      <span class="challenge-number">${isCodeSolved ? "✓" : String(challenge.id).padStart(2, "0")}</span>
-      <span class="challenge-link-copy">
-        <strong>${escapeHtml(challenge.title)}</strong>
-        <small>${escapeHtml(challenge.difficulty)}</small>
-      </span>
-      <span class="challenge-badges">
-        ${isCodeSolved ? '<span class="badge-dot is-code-done" title="Solução em código aprovada">💻</span>' : ""}
-        ${isTraceSolved ? '<span class="badge-dot is-trace-done" title="Teste de mesa explorado">📊</span>' : ""}
-        ${isQuizSolved ? '<span class="badge-dot is-quiz-done" title="Desafios respondidos com sucesso">🎯</span>' : ""}
-      </span>`;
-    
-    button.addEventListener("click", () => selectChallenge(challenge.id));
-    challengeList.append(button);
+  if (sidebarMode === "challenges") {
+    for (const challenge of challenges) {
+      const isCodeSolved = solvedIds.has(challenge.id);
+      const isTraceSolved = solvedTraces.has(challenge.id);
+      const isQuizSolved = solvedQuizzes.has(challenge.id);
+
+      const button = document.createElement("button");
+      button.className = `challenge-link${isCodeSolved ? " is-solved" : ""}`;
+      button.type = "button";
+      button.setAttribute("aria-current", (challenge.id === activeChallenge.id && activeView !== "theory") ? "page" : "false");
+      
+      button.innerHTML = `
+        <span class="challenge-number">${isCodeSolved ? "✓" : String(challenge.id).padStart(2, "0")}</span>
+        <span class="challenge-link-copy">
+          <strong>${escapeHtml(challenge.title)}</strong>
+          <small>${escapeHtml(challenge.difficulty)}</small>
+        </span>
+        <span class="challenge-badges">
+          ${isCodeSolved ? '<span class="badge-dot is-code-done" title="Solução em código aprovada">💻</span>' : ""}
+          ${isTraceSolved ? '<span class="badge-dot is-trace-done" title="Teste de mesa explorado">📊</span>' : ""}
+          ${isQuizSolved ? '<span class="badge-dot is-quiz-done" title="Desafios respondidos com sucesso">🎯</span>' : ""}
+        </span>`;
+      
+      button.addEventListener("click", () => selectChallenge(challenge.id));
+      challengeList.append(button);
+    }
+  } else {
+    if (typeof theoryTopics !== "undefined") {
+      for (const topic of theoryTopics) {
+        const isMastered = isTheoryTopicMastered(topic);
+        const score = getTheoryTopicScore(topic);
+        const isSelected = activeView === "theory" && topic.id === activeTheoryTopicId;
+
+        const button = document.createElement("button");
+        button.className = `challenge-link${isMastered ? " is-solved" : ""}`;
+        button.type = "button";
+        button.setAttribute("aria-current", isSelected ? "page" : "false");
+
+        button.innerHTML = `
+          <span class="challenge-number">${isMastered ? "✓" : String(topic.id).padStart(2, "0")}</span>
+          <span class="challenge-link-copy">
+            <strong>${escapeHtml(topic.aulaNumber)}: ${escapeHtml(topic.title)}</strong>
+            <small>${escapeHtml(topic.badge)} &middot; ${score.correct}/${score.total} acertos</small>
+          </span>
+          <span class="challenge-badges">
+            <span class="badge-dot" title="Acessar aula">📖</span>
+          </span>`;
+
+        button.addEventListener("click", () => selectTheoryTopic(topic.id));
+        challengeList.append(button);
+      }
+    }
   }
 }
 
@@ -1531,15 +1631,18 @@ function syncViewTabs() {
   const codeTab = document.querySelector("#tab-code-btn");
   const traceTab = document.querySelector("#tab-trace-btn");
   const interactiveTab = document.querySelector("#tab-interactive-btn");
+  const theoryTab = document.querySelector("#tab-theory-btn");
 
   const navCode = document.querySelector("#nav-mode-code");
   const navTrace = document.querySelector("#nav-mode-trace");
   const navQuiz = document.querySelector("#nav-mode-quiz");
+  const navTheory = document.querySelector("#nav-mode-theory");
 
   const tabs = [
     { view: "code", panelBtn: codeTab, navBtn: navCode },
     { view: "trace", panelBtn: traceTab, navBtn: navTrace },
-    { view: "interactive", panelBtn: interactiveTab, navBtn: navQuiz }
+    { view: "interactive", panelBtn: interactiveTab, navBtn: navQuiz },
+    { view: "theory", panelBtn: theoryTab, navBtn: navTheory }
   ];
 
   tabs.forEach(t => {
@@ -1551,9 +1654,17 @@ function syncViewTabs() {
   });
 }
 
-function setView(view) {
+function setView(view, topicId = null) {
   if (autoPlayTimer) stopAutoPlay();
   activeView = view;
+  if (view === "theory") {
+    sidebarMode = "theory";
+    if (topicId) activeTheoryTopicId = topicId;
+  } else {
+    sidebarMode = "challenges";
+  }
+  syncSidebarMode();
+  renderChallengeList();
   syncViewTabs();
   renderActiveView();
 }
@@ -1568,14 +1679,229 @@ function renderActiveView() {
     renderCodeView();
   } else if (activeView === "trace") {
     initTraceView();
-  } else {
+  } else if (activeView === "interactive") {
     initInteractiveView();
+  } else if (activeView === "theory") {
+    renderTheoryView();
   }
+}
+
+function selectTheoryTopic(topicId) {
+  activeTheoryTopicId = topicId;
+  sidebarMode = "theory";
+  setView("theory", topicId);
+}
+
+function answerTheoryExercise(exerciseId, optionIndex) {
+  theoryAnswers[exerciseId] = optionIndex;
+  saveStorage(STORAGE_KEYS.theory, theoryAnswers);
+  updateProgress();
+  renderChallengeList();
+  renderTheoryView();
+}
+
+function openChallengeInView(challengeId, targetView = "code") {
+  selectChallenge(challengeId, targetView);
+}
+
+function renderTheoryView() {
+  if (typeof theoryTopics === "undefined" || !theoryTopics.length) {
+    content.innerHTML = "<p>Conteúdo de teoria não encontrado.</p>";
+    return;
+  }
+
+  const topic = theoryTopics.find(t => t.id === activeTheoryTopicId) || theoryTopics[0];
+  const score = getTheoryTopicScore(topic);
+  const isMastered = isTheoryTopicMastered(topic);
+
+  // Navegador superior em pills de todas as 13 aulas
+  const pillsHtml = `
+    <nav class="theory-topics-nav" aria-label="Navegação entre aulas dos slides">
+      ${theoryTopics.map(t => {
+        const active = t.id === topic.id ? " is-active" : "";
+        const mastered = isTheoryTopicMastered(t) ? ' <span class="pill-check">✓</span>' : "";
+        return `<button class="theory-topic-pill-btn${active}" type="button" onclick="selectTheoryTopic(${t.id})">
+          <span>${escapeHtml(t.aulaNumber)}</span>${mastered}
+        </button>`;
+      }).join("")}
+    </nav>
+  `;
+
+  // Seções teóricas dos slides
+  const sectionsHtml = topic.sections.map((sec) => `
+    <div class="theory-card">
+      <div class="theory-card-header">
+        <span class="theory-card-icon" aria-hidden="true">${sec.icon}</span>
+        <h3>${escapeHtml(sec.title)}</h3>
+      </div>
+      <div class="theory-card-body">
+        ${sec.contentHtml}
+      </div>
+    </div>
+  `).join("");
+
+  // Rastreamento e teste de mesa com tabela exemplo
+  const trace = topic.traceExplanation;
+  const traceTableSampleHtml = trace.tableExample ? `
+    <div class="theory-table-wrapper" style="margin-top: 14px;">
+      <table class="trace-mini-table">
+        <thead>
+          <tr>${trace.tableExample.columns.map(c => `<th>${escapeHtml(c)}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          ${trace.tableExample.rows.map(row => `
+            <tr>${row.map(cell => `<td>${cell}</td>`).join("")}</tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  ` : "";
+
+  const traceBoxHtml = `
+    <div class="theory-trace-panel">
+      <div class="theory-trace-header">
+        <span class="theory-card-icon" aria-hidden="true">📊</span>
+        <h3>${escapeHtml(trace.title)}</h3>
+      </div>
+      <div class="theory-trace-body">
+        ${trace.contentHtml}
+        ${traceTableSampleHtml}
+      </div>
+    </div>
+  `;
+
+  // Desafios relacionados com botões para ir direto ao código/mesa
+  const relatedChallengesHtml = topic.relatedChallenges && topic.relatedChallenges.length ? `
+    <div class="theory-related-section">
+      <h3 class="theory-related-title">
+        <span aria-hidden="true">🔗</span>
+        <span>Questões Principais &amp; Desafios Relacionados</span>
+      </h3>
+      <div class="theory-related-grid">
+        ${topic.relatedChallenges.map(rc => `
+          <div class="related-challenge-card">
+            <div class="related-challenge-info">
+              <h4>Desafio ${String(rc.id).padStart(2, "0")}: ${escapeHtml(rc.title)}</h4>
+              <p>${escapeHtml(rc.reason)}</p>
+            </div>
+            <div class="related-challenge-actions">
+              <button class="btn-action-sm is-primary" type="button" onclick="openChallengeInView(${rc.id}, 'code')">
+                <span>💻 Resolver Código</span>
+              </button>
+              <button class="btn-action-sm" type="button" onclick="openChallengeInView(${rc.id}, 'trace')">
+                <span>📊 Simulação</span>
+              </button>
+              <button class="btn-action-sm" type="button" onclick="openChallengeInView(${rc.id}, 'interactive')">
+                <span>🎯 Teste de Mesa</span>
+              </button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  // Miniexercícios interativos com gabarito imediato
+  const exercisesHtml = `
+    <div class="theory-exercises-section">
+      <div class="theory-exercises-header">
+        <div>
+          <h3>✏️ Miniexercícios de Fixação do Tópico</h3>
+          <small style="color: var(--muted);">Teste sua compreensão imediata dos conceitos dos slides.</small>
+        </div>
+        <span class="theory-quiz-score-badge">
+          ${isMastered ? "⭐ Tópico Dominado!" : "Progresso:"} ${score.correct} de ${score.total} acertos
+        </span>
+      </div>
+
+      <div class="theory-quiz-list">
+        ${topic.miniExercises.map((ex, exIdx) => {
+          const selected = theoryAnswers[ex.id];
+          const hasAnswered = typeof selected === "number";
+          const isCorrect = selected === ex.correct;
+
+          return `
+            <div class="theory-quiz-card">
+              <div class="theory-quiz-prompt">
+                <strong>Questão ${exIdx + 1}:</strong> ${escapeHtml(ex.question)}
+              </div>
+              <div class="theory-quiz-options">
+                ${ex.options.map((opt, optIdx) => {
+                  let optClass = "theory-quiz-opt";
+                  let marker = String.fromCharCode(65 + optIdx);
+                  if (hasAnswered) {
+                    if (optIdx === ex.correct) {
+                      optClass += " is-correct";
+                      marker = "✓";
+                    } else if (optIdx === selected) {
+                      optClass += " is-wrong";
+                      marker = "✕";
+                    }
+                  }
+                  return `
+                    <button class="${optClass}" type="button" onclick="answerTheoryExercise('${ex.id}', ${optIdx})">
+                      <span class="theory-quiz-opt-marker">${marker}</span>
+                      <span>${escapeHtml(opt)}</span>
+                    </button>
+                  `;
+                }).join("")}
+              </div>
+
+              ${hasAnswered ? `
+                <div class="theory-quiz-explanation ${isCorrect ? 'is-success' : 'is-error'}">
+                  <strong>${isCorrect ? '✓ Resposta Correta!' : '✕ Não foi dessa vez.'}</strong>
+                  <p style="margin: 4px 0 0;">${escapeHtml(ex.explanation)}</p>
+                </div>
+              ` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+
+  content.innerHTML = `
+    <div class="theory-container">
+      ${pillsHtml}
+
+      <div class="theory-topline">
+        <span class="theory-kicker">CONTEÚDO DOS SLIDES · IMPACTA</span>
+        <span class="theory-badge-slide">📄 ${escapeHtml(topic.slideFile)} &middot; ${escapeHtml(topic.badge)}</span>
+      </div>
+
+      <div>
+        <h2 class="theory-title">${escapeHtml(topic.aulaNumber)}: ${escapeHtml(topic.title)}</h2>
+        <p class="theory-subtitle">${escapeHtml(topic.subtitle)}</p>
+      </div>
+
+      <div class="theory-summary-box">
+        <strong>Visão Geral da Aula:</strong> ${escapeHtml(topic.summary)}
+      </div>
+
+      ${sectionsHtml}
+
+      ${traceBoxHtml}
+
+      ${relatedChallengesHtml}
+
+      ${exercisesHtml}
+    </div>
+  `;
 }
 
 function renderCodeView() {
   const challenge = activeChallenge;
   const code = editorStorage[challenge.id] ?? challenge.starter;
+
+  const relatedTopicId = getTheoryTopicForChallenge(challenge.id);
+  const relatedTopic = typeof theoryTopics !== "undefined" ? theoryTopics.find(t => t.id === relatedTopicId) : null;
+  const theoryBannerHtml = relatedTopic ? `
+    <div class="challenge-theory-link-banner" role="button" tabindex="0" onclick="selectTheoryTopic(${relatedTopic.id})" title="Clique para ver a teoria desta aula nos slides">
+      <span class="theory-link-icon">📖</span>
+      <span class="theory-link-text">Fundamento Teórico nos Slides: <strong>${escapeHtml(relatedTopic.aulaNumber)} &mdash; ${escapeHtml(relatedTopic.title)}</strong></span>
+      <span class="theory-link-arrow">Ver Teoria &amp; Miniexercícios &rarr;</span>
+    </div>
+  ` : "";
 
   content.innerHTML = `
     <div class="challenge-topline">
@@ -1584,6 +1910,7 @@ function renderCodeView() {
     </div>
     <h2 class="challenge-title">${escapeHtml(challenge.title)}</h2>
     <p class="challenge-topic">${escapeHtml(challenge.topic)} <span aria-hidden="true">·</span> ${escapeHtml(challenge.lesson)}</p>
+    ${theoryBannerHtml}
     <div class="challenge-statement">${challenge.prompt}</div>
     <div class="example-box">
       <div class="example-heading">Exemplos</div>
@@ -1693,6 +2020,16 @@ function renderTraceView() {
 
   const thHtml = challenge.traceColumns.map(col => `<th>${escapeHtml(col)}</th>`).join("");
 
+  const relatedTopicId = getTheoryTopicForChallenge(challenge.id);
+  const relatedTopic = typeof theoryTopics !== "undefined" ? theoryTopics.find(t => t.id === relatedTopicId) : null;
+  const theoryBannerHtml = relatedTopic ? `
+    <div class="challenge-theory-link-banner" role="button" tabindex="0" onclick="selectTheoryTopic(${relatedTopic.id})" title="Clique para ver a teoria desta aula nos slides">
+      <span class="theory-link-icon">📖</span>
+      <span class="theory-link-text">Fundamento Teórico nos Slides: <strong>${escapeHtml(relatedTopic.aulaNumber)} &mdash; ${escapeHtml(relatedTopic.title)}</strong></span>
+      <span class="theory-link-arrow">Ver Teoria &amp; Miniexercícios &rarr;</span>
+    </div>
+  ` : "";
+
   content.innerHTML = `
     <div class="trace-panel-wrapper">
       <div class="challenge-topline">
@@ -1701,6 +2038,7 @@ function renderTraceView() {
       </div>
       <h2 class="challenge-title">${escapeHtml(challenge.title)} — Simulação Guiada</h2>
       <p class="challenge-topic">${escapeHtml(challenge.topic)} <span aria-hidden="true">·</span> ${escapeHtml(challenge.lesson)}</p>
+      ${theoryBannerHtml}
 
       <div class="trace-header-toolbar">
         <div class="trace-case-selector">
@@ -1907,6 +2245,16 @@ function initInteractiveView() {
 
 function renderInteractiveView() {
   const challenge = activeChallenge;
+
+  const relatedTopicId = getTheoryTopicForChallenge(challenge.id);
+  const relatedTopic = typeof theoryTopics !== "undefined" ? theoryTopics.find(t => t.id === relatedTopicId) : null;
+  const theoryBannerHtml = relatedTopic ? `
+    <div class="challenge-theory-link-banner" role="button" tabindex="0" onclick="selectTheoryTopic(${relatedTopic.id})" title="Clique para ver a teoria desta aula nos slides">
+      <span class="theory-link-icon">📖</span>
+      <span class="theory-link-text">Fundamento Teórico nos Slides: <strong>${escapeHtml(relatedTopic.aulaNumber)} &mdash; ${escapeHtml(relatedTopic.title)}</strong></span>
+      <span class="theory-link-arrow">Ver Teoria &amp; Miniexercícios &rarr;</span>
+    </div>
+  ` : "";
   
   content.innerHTML = `
     <div class="interactive-panel-wrapper">
@@ -1916,6 +2264,7 @@ function renderInteractiveView() {
       </div>
       <h2 class="challenge-title">${escapeHtml(challenge.title)} — Responder Teste de Mesa</h2>
       <p class="challenge-topic">${escapeHtml(challenge.topic)} <span aria-hidden="true">·</span> ${escapeHtml(challenge.lesson)}</p>
+      ${theoryBannerHtml}
 
       <div class="interactive-nav-bar">
         <div class="interactive-mode-pills" role="tablist">
@@ -2494,7 +2843,7 @@ function resetCode() {
   editor.focus();
 }
 
-function selectChallenge(id) {
+function selectChallenge(id, targetView = null) {
   const editor = document.querySelector("#python-editor");
   if (editor && activeView === "code") {
     editorStorage[activeChallenge.id] = editor.value;
@@ -2511,6 +2860,15 @@ function selectChallenge(id) {
   tableFillAnswers = {};
   tableFillChecked = false;
 
+  sidebarMode = "challenges";
+  if (targetView) {
+    activeView = targetView;
+  } else if (activeView === "theory") {
+    activeView = "code";
+  }
+
+  syncSidebarMode();
+  syncViewTabs();
   renderChallengeList();
   renderChallenge();
 }
@@ -2519,10 +2877,28 @@ function selectChallenge(id) {
 document.querySelector("#nav-mode-code")?.addEventListener("click", () => setView("code"));
 document.querySelector("#nav-mode-trace")?.addEventListener("click", () => setView("trace"));
 document.querySelector("#nav-mode-quiz")?.addEventListener("click", () => setView("interactive"));
+document.querySelector("#nav-mode-theory")?.addEventListener("click", () => setView("theory"));
 
 document.querySelector("#tab-code-btn")?.addEventListener("click", () => setView("code"));
 document.querySelector("#tab-trace-btn")?.addEventListener("click", () => setView("trace"));
 document.querySelector("#tab-interactive-btn")?.addEventListener("click", () => setView("interactive"));
+document.querySelector("#tab-theory-btn")?.addEventListener("click", () => setView("theory"));
+
+// Sidebar mode switcher
+document.querySelector("#sidebar-tab-challenges")?.addEventListener("click", () => {
+  sidebarMode = "challenges";
+  syncSidebarMode();
+  renderChallengeList();
+});
+
+document.querySelector("#sidebar-tab-theory")?.addEventListener("click", () => {
+  sidebarMode = "theory";
+  syncSidebarMode();
+  renderChallengeList();
+  if (activeView !== "theory") {
+    setView("theory");
+  }
+});
 
 renderChallengeList();
 renderChallenge();

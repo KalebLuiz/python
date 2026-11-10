@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#101622">
   <title>Laboratório Python — desafios e testes de mesa interativos</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="theory-data.js"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -28,6 +29,11 @@
         <span class="pill-icon" aria-hidden="true">🎯</span>
         <span>Responder Testes</span>
         <span class="pill-badge">Interativo</span>
+      </button>
+      <button id="nav-mode-theory" class="mode-pill" type="button" role="tab" aria-selected="false">
+        <span class="pill-icon" aria-hidden="true">📖</span>
+        <span>Teoria dos Slides</span>
+        <span class="pill-badge">Aulas 03 a 15</span>
       </button>
     </nav>
 
@@ -70,19 +76,37 @@
             <span id="quiz-progress-fill"></span>
           </div>
         </div>
+
+        <div class="progress-card">
+          <div class="progress-copy">
+            <span><span class="stat-icon">📖</span> Teoria dos Slides</span>
+            <strong id="theory-progress-label">0 de 13 tópicos dominados</strong>
+          </div>
+          <div class="progress-track" role="progressbar" aria-label="Progresso dos miniexercícios de teoria" aria-valuemin="0" aria-valuemax="13" aria-valuenow="0">
+            <span id="theory-progress-fill"></span>
+          </div>
+        </div>
       </div>
     </section>
 
     <div class="workspace">
-      <aside class="challenge-sidebar" aria-label="Lista de exercícios">
+      <aside class="challenge-sidebar" aria-label="Lista de exercícios e aulas teóricas">
+        <div class="sidebar-mode-toggle" role="tablist" aria-label="Alternar exibição da barra lateral">
+          <button id="sidebar-tab-challenges" class="sidebar-toggle-btn is-active" type="button" role="tab" aria-selected="true">
+            <span>💻 Desafios (10)</span>
+          </button>
+          <button id="sidebar-tab-theory" class="sidebar-toggle-btn" type="button" role="tab" aria-selected="false">
+            <span>📖 Aulas / Teoria (13)</span>
+          </button>
+        </div>
         <div class="sidebar-heading">
-          <h2>Exercícios</h2>
+          <h2 id="sidebar-title">Exercícios</h2>
           <span id="challenge-count">10 disponíveis</span>
         </div>
         <nav id="challenge-list" class="challenge-list"></nav>
         <div class="sidebar-foot">
           <span class="sidebar-foot-icon" aria-hidden="true">⌘</span>
-          <p>Você pode testar código em Python, simular variáveis passo a passo ou interagir respondendo aos testes de mesa.</p>
+          <p id="sidebar-foot-desc">Você pode testar código em Python, simular variáveis passo a passo, responder aos testes de mesa ou estudar a teoria dos slides com miniexercícios.</p>
         </div>
       </aside>
 
@@ -100,6 +124,11 @@
             <span class="panel-tab-icon" aria-hidden="true">🎯</span>
             <span>Responder Teste de Mesa</span>
             <span class="tab-badge">Interativo</span>
+          </button>
+          <button id="tab-theory-btn" class="panel-tab" role="tab" aria-selected="false" type="button">
+            <span class="panel-tab-icon" aria-hidden="true">📖</span>
+            <span>Teoria dos Slides</span>
+            <span class="tab-badge">Aulas 03 a 15</span>
           </button>
         </div>
 
